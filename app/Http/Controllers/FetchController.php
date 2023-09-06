@@ -2,26 +2,34 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\City;
-use App\Models\Province;
-use Illuminate\Http\Request;
+use App\Services\FetchService;
 
 class FetchController extends Controller
 {
+
+    protected $fetchService;
+
+    public function __construct(FetchService $fetchService)
+    {
+        $this->fetchService = $fetchService;
+    }
+
     public function provinces()
     {
-        $model = Province::when(request()->filled('id'), function($query) {
+        $result = $this->fetchService->getProvince()->when(request()->filled('id'), function($query) {
             $query->where('province_id', request('id'));
+        })->when(request()->filled('search'), function($query) {
+            $query->where('province', 'LIKE', '%'.request('search').'%');
         });
         if (request('id')) {
-            $model = $model->first();
+            $result = $result->first();
         } else {
-            $model = $model->get();
+            $result = $result->get();
         }
-        if ($model) {
+        if ($result) {
             return response()->json([
                 'success' => true,
-                'data' => $model
+                'data' => $result
             ], 200);
         }
         return response()->json([
@@ -32,18 +40,23 @@ class FetchController extends Controller
 
     public function cities()
     {
-        $model = City::with('province')->when(request()->filled('id'), function($query) {
+        $result = $this->fetchService->getCity()->with('province')->when(request()->filled('id'), function($query) {
             $query->where('city_id', request('id'));
+        })->when(request()->filled('search'), function($query) {
+            $query->where('city_name', 'LIKE', '%'.request('search').'%')
+                ->orWhereHas('province', function($provinceQuery) {
+                    $provinceQuery->where('province', 'LIKE', '%'.request('search').'%');
+                });
         });
         if (request('id')) {
-            $model = $model->first();
+            $result = $result->first();
         } else {
-            $model = $model->get();
+            $result = $result->get();
         }
-        if ($model) {
+        if ($result) {
             return response()->json([
                 'success' => true,
-                'data' => $model
+                'data' => $result
             ], 200);
         }
         return response()->json([
